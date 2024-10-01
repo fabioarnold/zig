@@ -1788,11 +1788,6 @@ test {
 
 // Detects executable header: ELF or Macho-O magic header or shebang line.
 const FileHeader = struct {
-    const elf_magic = std.elf.MAGIC;
-    const macho_magic = std.macho.MH_MAGIC;
-    const macho64_magic = std.macho.MH_MAGIC_64;
-    const shebang = "#!";
-
     header: [4]u8 = undefined,
     bytes_read: usize = 0,
 
@@ -1803,21 +1798,26 @@ const FileHeader = struct {
         self.bytes_read += n;
     }
 
-    fn isShebang(self: *FileHeader) bool {
+    fn isScript(self: *FileHeader) bool {
+        const shebang = "#!";
         return std.mem.eql(u8, self.header[0..shebang.len], shebang);
     }
 
     fn isElf(self: *FileHeader) bool {
+        const elf_magic = std.elf.MAGIC;
         return std.mem.eql(u8, self.header[0..elf_magic.len], elf_magic);
     }
 
     fn isMachO(self: *FileHeader) bool {
-        const magic = std.mem.readInt(u32, &self.header, .little);
-        return magic == macho_magic or magic == macho64_magic;
+        const magic_number = std.mem.readInt(u32, &self.header, builtin.cpu.arch.endian());
+        return magic_number == std.macho.MH_MAGIC or
+            magic_number == std.macho.MH_MAGIC_64 or
+            magic_number == std.macho.FAT_MAGIC or
+            magic_number == std.macho.FAT_MAGIC_64;
     }
 
     pub fn isExecutable(self: *FileHeader) bool {
-        return self.isShebang() or self.isElf() or self.isMachO();
+        return self.isScript() or self.isElf() or self.isMachO();
     }
 };
 
